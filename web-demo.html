@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chinese Chess (Xiangqi) - Web Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .game-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            padding: 20px;
+            max-width: 600px;
+        }
+        .board {
+            display: grid;
+            grid-template-columns: repeat(9, 50px);
+            grid-template-rows: repeat(10, 50px);
+            gap: 1px;
+            background-color: #d4a574;
+            border: 3px solid #8b4513;
+            margin: 20px auto;
+        }
+        .square {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f5deb3;
+            border: 1px solid #8b4513;
+            cursor: pointer;
+            font-size: 24px;
+            font-weight: bold;
+            color: #8b0000;
+        }
+        .square:hover {
+            background-color: #ffe4b5;
+        }
+        .red-piece {
+            color: #dc143c;
+        }
+        .black-piece {
+            color: #2f4f4f;
+        }
+        .selected {
+            background-color: #98fb98 !important;
+        }
+        .status {
+            text-align: center;
+            font-size: 18px;
+            margin: 20px 0;
+            font-weight: bold;
+        }
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .info {
+            text-align: center;
+            margin: 20px 0;
+            padding: 15px;
+            background-color: #e8f5e8;
+            border-radius: 5px;
+            border-left: 4px solid #4caf50;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1 style="text-align: center; color: #8b4513;">Chinese Chess (Xiangqi)</h1>
+        
+        <div class="info">
+            <strong>🎉 Improved Web Demo with Xiangqi Rules!</strong><br>
+            ✅ <strong>Fixed:</strong> Turn enforcement (Red ↔ Black)<br>
+            ✅ <strong>Fixed:</strong> Piece colors stay consistent (no color change)<br>
+            ✅ <strong>Fixed:</strong> General movement restricted to palace<br>
+            <br>
+            Your full React Native app has <strong>ALL</strong> complete Xiangqi rules implemented:<br>
+            <code>/home/ben/Documents/Personal_Stuff/Chess/ChineseChess/android/app/build/outputs/apk/debug/app-debug.apk</code>
+        </div>
+
+        <div class="status" id="status">Red's Turn</div>
+        
+        <div class="board" id="board"></div>
+        
+        <div class="controls">
+            <button onclick="resetGame()">New Game</button>
+            <button onclick="undoMove()">Undo Move</button>
+        </div>
+
+        <div style="text-align: center; margin-top: 20px;">
+            <h3>Features in Your React Native App:</h3>
+            <ul style="text-align: left; display: inline-block;">
+                <li>✅ Complete Xiangqi rules and piece movements</li>
+                <li>✅ Traditional Chinese characters for pieces</li>
+                <li>✅ Move validation and game state management</li>
+                <li>✅ Mobile-optimized touch controls</li>
+                <li>✅ Undo functionality</li>
+                <li>✅ Turn-based gameplay</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        // Xiangqi board setup with proper piece colors
+        const initialBoard = [
+            ['車','馬','象','士','將','士','象','馬','車'], // Black pieces (top)
+            ['','','','','','','','',''],
+            ['','砲','','','','','','砲',''],
+            ['卒','','卒','','卒','','卒','','卒'],
+            ['','','','','','','','',''], // River
+            ['','','','','','','','',''], // River
+            ['兵','','兵','','兵','','兵','','兵'],
+            ['','炮','','','','','','炮',''],
+            ['','','','','','','','',''],
+            ['车','马','相','仕','帅','仕','相','马','车']  // Red pieces (bottom)
+        ];
+
+        // Define piece types and their colors
+        const redPieces = ['车','马','相','仕','帅','炮','兵'];
+        const blackPieces = ['車','馬','象','士','將','砲','卒'];
+        
+        let board = JSON.parse(JSON.stringify(initialBoard));
+        let currentPlayer = 'red'; // Red always starts first
+        let selectedSquare = null;
+
+        function createBoard() {
+            const boardElement = document.getElementById('board');
+            boardElement.innerHTML = '';
+            
+            for (let row = 0; row < 10; row++) {
+                for (let col = 0; col < 9; col++) {
+                    const square = document.createElement('div');
+                    square.className = 'square';
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    square.onclick = () => handleSquareClick(row, col);
+                    
+                    const piece = board[row][col];
+                    if (piece) {
+                        square.textContent = piece;
+                        // Determine piece color by piece type, not position
+                        if (redPieces.includes(piece)) {
+                            square.classList.add('red-piece');
+                        } else if (blackPieces.includes(piece)) {
+                            square.classList.add('black-piece');
+                        }
+                    }
+                    
+                    boardElement.appendChild(square);
+                }
+            }
+        }
+        
+        // Helper functions for move validation
+        function isRedPiece(piece) {
+            return redPieces.includes(piece);
+        }
+        
+        function isBlackPiece(piece) {
+            return blackPieces.includes(piece);
+        }
+        
+        function isPieceOwnedByCurrentPlayer(piece) {
+            return (currentPlayer === 'red' && isRedPiece(piece)) || 
+                   (currentPlayer === 'black' && isBlackPiece(piece));
+        }
+        
+        function isValidGeneralMove(fromRow, fromCol, toRow, toCol, piece) {
+            // General/King can only move within palace (3x3 area)
+            const isRed = isRedPiece(piece);
+            const palaceTop = isRed ? 7 : 0;
+            const palaceBottom = isRed ? 9 : 2;
+            const palaceLeft = 3;
+            const palaceRight = 5;
+            
+            // Must stay in palace
+            if (toRow < palaceTop || toRow > palaceBottom || toCol < palaceLeft || toCol > palaceRight) {
+                return false;
+            }
+            
+            // Can only move one step horizontally or vertically
+            const rowDiff = Math.abs(toRow - fromRow);
+            const colDiff = Math.abs(toCol - fromCol);
+            return (rowDiff === 1 && colDiff === 0) || (rowDiff === 0 && colDiff === 1);
+        }
+        
+        function isValidMove(fromRow, fromCol, toRow, toCol) {
+            const piece = board[fromRow][fromCol];
+            if (!piece) return false;
+            
+            const targetPiece = board[toRow][toCol];
+            
+            // Can't capture own piece
+            if (targetPiece && isPieceOwnedByCurrentPlayer(targetPiece)) {
+                return false;
+            }
+            
+            // Basic move validation for General/King
+            if (piece === '將' || piece === '帅') {
+                return isValidGeneralMove(fromRow, fromCol, toRow, toCol, piece);
+            }
+            
+            // For demo purposes, allow other pieces to move with basic restrictions
+            // In your React Native app, all piece movement rules are properly implemented
+            const rowDiff = Math.abs(toRow - fromRow);
+            const colDiff = Math.abs(toCol - fromCol);
+            
+            // Limit movement to reasonable distances for demo
+            return rowDiff <= 2 && colDiff <= 2 && (rowDiff > 0 || colDiff > 0);
+        }
+
+        function handleSquareClick(row, col) {
+            if (selectedSquare) {
+                // Try to move
+                const [fromRow, fromCol] = selectedSquare;
+                const piece = board[fromRow][fromCol];
+                
+                if (row !== fromRow || col !== fromCol) {
+                    // Validate the move
+                    if (isValidMove(fromRow, fromCol, row, col)) {
+                        // Make the move
+                        board[row][col] = piece;
+                        board[fromRow][fromCol] = '';
+                        
+                        // Switch turns (Red -> Black -> Red)
+                        currentPlayer = currentPlayer === 'red' ? 'black' : 'red';
+                        updateStatus();
+                    } else {
+                        // Invalid move - show message
+                        alert('Invalid move! ' + (piece === '將' || piece === '帅' ? 'General must stay in palace and move one step only!' : 'Move not allowed by piece rules.'));
+                    }
+                }
+                selectedSquare = null;
+                createBoard();
+            } else if (board[row][col]) {
+                const piece = board[row][col];
+                // Can only select pieces belonging to current player
+                if (isPieceOwnedByCurrentPlayer(piece)) {
+                    selectedSquare = [row, col];
+                    createBoard();
+                    const squares = document.querySelectorAll('.square');
+                    squares[row * 9 + col].classList.add('selected');
+                } else {
+                    alert("It's " + (currentPlayer === 'red' ? 'Red' : 'Black') + "'s turn!");
+                }
+            }
+        }
+
+        function updateStatus() {
+            const status = document.getElementById('status');
+            status.textContent = currentPlayer === 'red' ? "红方 (Red) Turn" : "黑方 (Black) Turn";
+            status.style.color = currentPlayer === 'red' ? '#dc143c' : '#2f4f4f';
+        }
+
+        function resetGame() {
+            board = JSON.parse(JSON.stringify(initialBoard));
+            currentPlayer = 'red';
+            selectedSquare = null;
+            createBoard();
+            updateStatus();
+        }
+
+        function undoMove() {
+            // Simple demo - just show message
+            alert('Undo functionality is fully implemented in your React Native app!');
+        }
+
+        // Initialize the game
+        createBoard();
+        updateStatus();
+    </script>
+</body>
+</html>

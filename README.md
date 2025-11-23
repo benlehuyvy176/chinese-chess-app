@@ -1,4 +1,6 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Chinese Chess (Xiangqi) Mobile App
+
+A fully functional Chinese Chess (象棋) mobile application built with React Native for both Android and iOS platforms.
 
 # Getting Started
 
